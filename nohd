@@ -1,0 +1,33 @@
+// ==UserScript==
+// @name         viewhd 跳转
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @author       (you)
+// @match        *://*/video/viewhd/*
+// @grant        none
+// ==/UserScript==
+
+(function () {
+  'use strict';
+
+  // 处理双击事件
+  function onDblClick(e) {
+    // 只在 path 包含 /video/viewhd/ 时生效
+    const p = window.location.pathname || '';
+    const marker = '/video/viewhd/';
+    if (!p.includes(marker)) return;
+
+    // 构造新路径（仅替换第一次出现）
+    const newPath = p.replace(marker, '/video/view/');
+
+    // 组合保留 query/hash
+    const u = new URL(window.location.href);
+    u.pathname = newPath;
+
+    // 使用 replace 避开浏览器回退堆栈
+    window.location.replace(u.toString());
+  }
+
+  // 绑定事件
+  document.addEventListener('dblclick', onDblClick, { passive: true });
+})();
