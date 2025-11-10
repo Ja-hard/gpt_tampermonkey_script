@@ -1,0 +1,56 @@
+// ==UserScript==
+// @name         豆瓣标签过滤（白名单优先）
+// @namespace    https://*.douban.com/
+// @version      1.2
+// @description  先检查白名单，再检查黑名单；命中白名单则保留，命中黑名单则隐藏
+// @match        https://movie.douban.com/tv/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // 你可以自由编辑
+    const whitelistTags = ["1008611", "悬疑"];
+    const blacklistTags = ["动画", "短片", "爱情", "纪录片", "真人秀"];
+
+    function shouldHide(text) {
+        // 白名单优先
+        // const inWhite = whitelistTags.some(tag => text.includes(tag));
+        // if (inWhite) return false;
+
+        // 黑名单其次
+        const inBlack = blacklistTags.some(tag => text.includes(tag));
+        return inBlack; // true → 隐藏
+    }
+
+    function filterItems() {
+        document.querySelectorAll('li .drc-subject-card').forEach(card => {
+            const subtitle = card.querySelector('.drc-subject-info-subtitle');
+            if (!subtitle) return;
+
+            const text = subtitle.textContent.trim();
+            const li = card.closest('li');
+            if (!li) return;
+
+            if (shouldHide(text)) {
+                if (li.style.display !== 'none') {
+                    li.style.display = 'none';
+                    console.log('隐藏:', text);
+                }
+            }
+            // else {
+            //     // 白名单命中的情况，有些用户希望恢复显示
+            //     if (li.style.display === 'none') {
+            //         li.style.display = '';
+            //         console.log('保留（白名单）:', text);
+            //     }
+            // }
+        });
+    }
+
+    filterItems();
+
+    const observer = new MutationObserver(() => filterItems());
+    observer.observe(document.body, { childList: true, subtree: true });
+})();
