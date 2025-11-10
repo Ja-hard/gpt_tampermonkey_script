@@ -1,0 +1,270 @@
+// ==UserScript==
+// @name        U2 大量派發紅包腳本
+// @version     0.0.5
+//
+// @description 在 U2 大量派發紅包的好工具
+// @author      a0000778
+//
+// @downloadURL https://share.a0000778.name/userscript/U2/gift.user.js
+// @updateURL   https://share.a0000778.name/userscript/U2/gift.meta.js
+//
+// @include     http://u2.dmhy.org/ucoin.php
+// @include     https://u2.dmhy.org/ucoin.php
+//
+// @grant       none
+// ==/UserScript==
+function $(select){
+	return arguments.length? document.getElementById(select):document.body;
+}
+$.tag=function(tagname, conf){
+	var ele=document.createElement(tagname);
+	(function(obj,conf){
+		for(var k in conf){
+			if('function'===typeof obj[k]) obj[k].apply(obj,conf[k]);
+			else if('object'===typeof conf[k]) arguments.callee(obj[k],conf[k]);
+			else obj[k]=conf[k];
+		}
+	})(ele,conf);
+	return ele;
+}
+HTMLElement.prototype.$add=function(){
+	var at=0;
+	var ele=('string'===typeof arguments[at])? $.tag(arguments[at++],arguments[at++]):arguments[at++];
+	if(arguments[at]) this.insertBefore(ele,arguments[at++]);
+	else this.appendChild(ele);
+	return (arguments[++at]? this:ele);
+}
+HTMLElement.prototype.$del=function (returnParent){
+	this.parentNode.removeChild(this);
+	return (returnParent? this.parentNode:this);
+}
+if(!window.NamedNodeMap) window.NamedNodeMap=MozNamedAttrMap;//for FireFox
+if(!HTMLCollection.prototype.forEach) HTMLCollection.prototype.forEach=Array.prototype.forEach;
+if(!NamedNodeMap.prototype.forEach) NamedNodeMap.prototype.forEach=Array.prototype.forEach;
+if(!NodeList.prototype.forEach) NodeList.prototype.forEach=Array.prototype.forEach;
+if(!HTMLCollection.prototype.reduce) HTMLCollection.prototype.reduce=Array.prototype.reduce;
+if(!NamedNodeMap.prototype.reduce) NamedNodeMap.prototype.reduce=Array.prototype.reduce;
+if(!NodeList.prototype.reduce) NodeList.prototype.reduce=Array.prototype.reduce;
+function Ajax(method, url, data, option){
+	this.xhr=new XMLHttpRequest();
+	this.method=method.toUpperCase();
+	this.url=url;
+	this.data=data? data:null;
+	var option=option? option:{};
+	this.option={
+		'async': option.hasOwnProperty('async')? option.async:true,
+		'auth': option.hasOwnProperty('auth')? {
+			'user': option.auth.hasOwnProperty('user')? option.auth.user:null,
+			'pass': option.auth.hasOwnProperty('pass')? option.auth.pass:null
+		}:{},
+		'formData': option.hasOwnProperty('formData')? formData:true
+	};
+}
+Ajax.prototype.setHeader=function(header,value){
+	this.xhr.setRequestHeader(header,value);
+	return this;
+}
+Ajax.prototype.on=function(eventName,func){
+	this.xhr.addEventListener(eventName,func.bind(this));
+	return this;
+}
+Ajax.prototype.send=function(){
+	if(this.method=='GET' || !this.option.formData){
+		var data='';
+		var s='';
+		for(k in this.data){
+			if('object'==typeof this.data[k]){
+				data+=s+this.data[k].reduce(function(r,v){
+					r.r+=r.s+r.k+'='+encodeURIComponent(v);
+					r.s='&';
+				},{'r':'','s':'','k':k+'[]'}).r;
+			}else{
+				data+=s+k+'='+encodeURIComponent(this.data[k]);
+			}
+			s='&';
+		}
+	}else{
+		var data=new FormData();
+		for(k in this.data){
+			if('object'==typeof this.data[k]){
+				this.data[k].forEach(function(k,v){
+					this.append(k+'[]',v);
+				}.bind(data,k));
+			}else{
+				data.append(k,this.data[k]);
+			}
+		}
+	}
+	this.xhr.open(
+		this.method,
+		this.url+(this.method=='GET'? (this.url.indexOf('?')>=0? '&':'?')+data:''),
+		this.option.async,
+		this.option.auth.user,
+		this.option.auth.pass
+	);
+	this.xhr.send(this.method=='GET'? null:data);
+	return this;
+}
+Ajax.prototype.abort=function(){
+	this.xhr.abort();
+	return this;
+}
+Ajax.prototype.result=function(forceText){
+	if(this.xhr.readyState!==4) return null;
+	return forceText? this.xhr.responseText:this.xhr.response;
+}
+Ajax.prototype.resultHeader=function(select){
+	if(this.xhr.readyState!==4) return null;
+	if(select) return this.xhr.getResponseHeader(select);
+	else return this.xhr.getAllResponseHeaders().split('\n').reduce(function(r,v){
+		if(!v.length) return r;
+		var s=v.indexOf(':');
+		r[v.substring(0,s)]=v.substring(s+2,v.length);
+		return r;
+	},{});
+}
+
+if(!DOMEffect) var DOMEffect={};
+(function(DOMEffect){
+	var fade=function(obj,opacity){
+		obj.style.opacity=opacity;
+	}
+	DOMEffect.fadeIn=function(obj,time,fps){
+		var time=time? time:1000;
+		var fps=fps? fps:60;
+		var b_value=fps/time;
+		var timeout=[];
+		while(timeout.length*1000/fps<time){
+			timeout.push(setTimeout(fade,timeout.length*fps,obj,timeout.length*b_value));
+		}
+		timeout.push(setTimeout(fade,time,obj,1));
+		return timeout;
+	}
+	DOMEffect.fadeOut=function(obj,time,fps){
+		var time=time? time:1000;
+		var fps=fps? fps:60;
+		var b_value=fps/time;
+		var timeout=[];
+		while(timeout.length*1000/fps<time){
+			timeout.push(setTimeout(fade,timeout.length*fps,obj,1-timeout.length*b_value));
+		}
+		timeout.push(setTimeout(fade,time,obj,0));
+		return timeout;
+	}
+})(DOMEffect);
+
+var sending=false;
+function start(amount,msg,recvList){
+	var list=[];
+	var at=0;
+	var exists;
+	while(at<recvList.length){
+		if((exists=list.indexOf(recvList[at]))<0)
+			list.push({'id':recvList[at],'amount':amount});
+		else
+			list[exists].amount+=recvList[at];
+		at++;
+	}
+	at=0;
+	while(at<list.length){
+		if(list[at].amount>150000)
+			list.splice(at,1,{'id':list[at].id,'amount':150000},{'id':list[at].id,'amount':list[at].amount-150000});
+		at++;
+	}
+	sending=true;
+	progress_ui.value=0;
+	progress_ui.max=list.length;
+	progress_msg.textContent='啟動中...'
+	DOMEffect.fadeIn(progress);
+	progress.style.display='block';
+	setTimeout(run,1000*60*5,0,list,msg);
+}
+function run(at,list,msg){
+	progress_ui.value=at;
+	progress_msg.textContent='處理發送 id='+list[at].id+', UCoin='+list[at].amount+' ... ('+at+'/'+list.length+')';
+	new Ajax('POST','/mpshop.php',{
+		'event': '1003',
+		'recv': list[at].id,
+		'amount': list[at].amount,
+		'message': msg
+	})
+	.on('load',function(){
+		progress_ui.value=++at;
+		if(at<list.length){
+			progress_msg.textContent='等待間隔時間... ('+at+'/'+list.length+')';
+			setTimeout(run,1000*60*5+1000,at,list,msg);
+		}else{
+			sending=false;
+			progress_msg.textContent='派發完畢！';
+			alert('派發完畢！');
+			DOMEffect.fadeOut(progress);
+			setTimeout(function(){progress.style.display='none';},1000);
+		}
+	})
+	.send();
+}
+
+var form=$().querySelector('input[name="event"][value="1003"]').parentElement.parentElement;
+form
+	.$add('h3',{'textContent':'大量發送'},null,true)
+	.$add('ul',{})
+		.$add('li',{'textContent':'處理期間必須持續開著頁面，且不可切離該頁面(切離頁面可能導致暫停處理或直接中斷)'},null,true)
+		.$add('li',{'textContent':'開始前會先行等待 5 分鐘，以防止前次發送間隔不足'},null,true)
+		.$add('li',{'textContent':'超過 150000 Ucoin 會自動拆成多筆，亦會產生額外手續費'},null,true)
+		.$add('li',{'textContent':'重複添加 id，將會對該 id 發送多份(會合併一次發送)'},null,true)
+		.$add('li',{'textContent':'將 id 以","分隔可以一次添加大量發送目標'},null,true)
+		.$add('li',{'textContent':'手滑送錯人後果自負'},null,true)
+		.$add('li',{'textContent':'願意的話也派給腳本作者一份(id=36320)'},null,true)
+form.$add('form',{})
+	.$add('input',{'type':'text','name':'recv','style':{'width':'127px','textAlign':'right'}},null,true)
+	.$add('input',{'type':'submit','value':'添加'},null,true)
+	.addEventListener('submit',function(e){
+		e.preventDefault();
+		this.querySelector('input[name=recv]').value.split(/ *, */).forEach(function(id){
+			if(!/^\d*$/.test(id)){
+				alert('輸入錯誤：'+id);
+				return;
+			}
+			this.$add('option',{'value':id,'textContent':id});
+		},recvList);
+		this.querySelector('input[name=recv]').value='';
+	});
+var sendForm=form.$add('form',{});
+var recvList=sendForm.$add('select',{'name':'recvlist','multiple':true,'style':{'width':'131px'}});
+sendForm.$add('input',{'type':'button','value':'刪除'}).addEventListener('click',function(){
+	sendForm.querySelectorAll('select[name=recvlist]>option:checked').forEach(function(i){
+		i.$del();
+	});
+});
+sendForm.$add('p')
+	.$add(document.createTextNode('數額：'),null,true)
+	.$add('input',{'type':'text','name':'amount','size':'8'},null,true)
+sendForm.$add('p')
+	.$add(document.createTextNode('附言：'),null,true)
+	.$add('input',{'type':'text','name':'message','maxLength':'70'},null,true)
+sendForm.$add('input',{'type':'submit','value':'發射'},null,true);
+sendForm.addEventListener('submit',function(e){
+	e.preventDefault();
+	if(sending){alert('這麼好心想多配發幾次?');return;}
+	var amount=parseInt(sendForm.querySelector('input[name=amount]').value,10);
+	var list=sendForm.querySelectorAll('select[name=recvlist]>option').reduce(function(r,v){
+		r.push(v.value);
+		return r;
+	},[]);
+	if(amount<=0){alert('金額為 '+amount+' ... 有這樣派的麼?');return;}
+	if(!list.length){alert('沒有發送對象阿!');return;}
+	if(!confirm(
+		'確定要發送以下項目？\n'+
+		'數額：'+amount+' UCoin (稅後：'+Math.floor(amount*1.5+100)+' UCoin)\n'+
+		'份數：'+list.length+' 份\n'+
+		'總額：'+(amount*list.length)+' UCoin (稅後：'+(Math.floor(amount*1.5+100)*list.length)+' UCoin，如有多筆合併則更低)'
+	)) return;
+	start(
+		amount,
+		sendForm.querySelector('input[name=message]').value,
+		list
+	);
+});
+var progress=form.$add('div',{'style':{'display':'none'}});
+var progress_ui=progress.$add('progress');
+var progress_msg=progress.$add('span');
