@@ -1,0 +1,122 @@
+// ==UserScript==
+// @name         自动切换B站字幕
+// @namespace    http://tampermonkey.net/
+// @version      1.2
+// @description  自动开启中文或双语字幕，按c键切换状态，支持SPA视频切换
+// @author       GPT
+// @match        https://www.bilibili.com/video/*
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @run-at       document-idle
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // 默认字幕状态为开启
+    if (GM_getValue('subtitleState') === undefined) GM_setValue('subtitleState', true);
+
+    let lastUrl = location.href;
+
+    function log(...args) {
+        console.log('[字幕脚本]', ...args);
+    }
+
+    function autoSwitchSubtitle() {
+        log('执行自动字幕逻辑');
+
+        const subtitleBtn = document.querySelector('.bpx-player-ctrl-subtitle');
+        if (!subtitleBtn) {
+            log('未找到AI字幕按钮，退出');
+            return;
+        }
+        log('检测到AI字幕');
+
+        const state = GM_getValue('subtitleState', true);
+        if (!state) {
+            log('字幕状态为关闭，退出');
+            return;
+        }
+
+        const bilingualSwitch = document.querySelector('.bpx-player-ctrl-subtitle-bilingual-bottom input[type=checkbox]');
+        if (bilingualSwitch) {
+            log('检测到双语字幕开关，点击开启');
+            if (!bilingualSwitch.checked) bilingualSwitch.click();
+
+            // 等DOM渲染主副字幕语言列表
+            setTimeout(() => {
+                const majorItems = document.querySelectorAll('.bpx-player-ctrl-subtitle-major-inner .bpx-player-ctrl-subtitle-language-item');
+                const minorItems = document.querySelectorAll('.bpx-player-ctrl-subtitle-minor-inner .bpx-player-ctrl-subtitle-language-item');
+
+                majorItems.forEach(item => {
+                    if (item.dataset.lan === 'ai-zh') {
+                        log('主字幕: 选择中文');
+                        item.click();
+                    }
+                    if (item.dataset.lan === 'ai-en' && item.classList.contains('bpx-state-active')) {
+                        item.classList.remove('bpx-state-active');
+                    }
+                });
+
+                minorItems.forEach(item => {
+                    if (item.dataset.lan === 'ai-en') {
+                        log('副字幕: 选择英文');
+                        item.click();
+                    }
+                    if (item.dataset.lan === 'ai-zh' && item.classList.contains('bpx-state-active')) {
+                        item.classList.remove('bpx-state-active');
+                    }
+                });
+
+            }, 300); // 延迟确保 DOM 渲染完毕
+        } else {
+            // 没有双语字幕，点击中文
+            const chineseItem = document.querySelector('.bpx-player-ctrl-subtitle-language-item[data-lan="ai-zh"]');
+            if (chineseItem) {
+                log('没有双语字幕，点击中文');
+                chineseItem.click();
+            }
+        }
+    }
+
+    // 按c切换字幕状态
+    document.addEventListener('keydown', (e) => {
+        if (
+            e.key.toLowerCase() === 'c' &&
+            !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey
+        ) {
+            const current = GM_getValue('subtitleState', true);
+            GM_setValue('subtitleState', !current);
+            log('字幕状态切换为', !current ? '关闭' : '开启');
+            if (!current) autoSwitchSubtitle();
+        }
+    });
+
+
+    // SPA页面URL变化监听
+    function onUrlChange(callback) {
+        const observer = new MutationObserver(() => {
+            if (location.href !== lastUrl) {
+                lastUrl = location.href;
+                callback();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        // setInterval(() => {
+        //     if (location.href !== lastUrl) {
+        //         lastUrl = location.href;
+        //         callback();
+        //     }
+        // }, 1500);
+    }
+
+    onUrlChange(() => {
+        log('URL变化，重新执行字幕逻辑');
+        setTimeout(autoSwitchSubtitle, 500);
+    });
+
+    // 首次执行
+    log('初始化');
+    setTimeout(autoSwitchSubtitle, 500);
+})();
