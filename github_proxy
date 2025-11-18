@@ -1,0 +1,60 @@
+/**
+ * Welcome to Cloudflare Workers! This is your first worker.
+ *
+ * - Run "npm run dev" in your terminal to start a development server
+ * - Open a browser tab at http://localhost:8787/ to see your worker in action
+ * - Run "npm run deploy" to publish your worker
+ *
+ * Learn more at https://developers.cloudflare.com/workers/
+ */
+
+export default {
+  async fetch(request, env) {
+    // --- 1. 鉴权部分 ---
+    
+    // 从环境变量中获取您预设的用于鉴权的密钥
+    const SECRET_KEY = env.AUTH_KEY; 
+
+    // 从请求的 URL 中解析出查询参数
+    const url = new URL(request.url);
+    const providedKey = url.searchParams.get('auth'); // 我们约定使用 'auth' 作为参数名
+    const FILE_PATH = url.searchParams.get('path');
+
+    if (providedKey !== SECRET_KEY) {
+      // 如果不匹配或未提供，则返回 403 Forbidden 错误
+      return new Response('Unauthorized', { status: 403 });
+    }
+
+    // --- 2. 鉴权通过后，执行获取文件的逻辑 ---
+    // 从环境变量中获取 GitHub 配置
+    const GITHUB_TOKEN = env.GITHUB_TOKEN;
+    // const GITHUB_TOKEN = providedKey;
+    const REPO_OWNER = 'Ja-hard'; // 替换为您的 GitHub 用户名
+    const REPO_NAME = 'clash'; // 替换为您的私有仓库名称
+
+    // 构建 GitHub API URL
+    const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
+
+    // 向 GitHub API 发送请求
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3.raw', // 获取原始文件内容
+        'User-Agent': 'Cloudflare-Worker' // GitHub API 要求提供 User-Agent
+      }
+    });
+
+    // 检查响应是否成功
+    if (response.ok) {
+      // 获取文件内容并作为响应返回
+      return new Response(await response.text(), {
+        headers: {
+          'Content-Type': 'text/plain;charset=UTF-8' // 根据文件类型调整 Content-Type
+        }
+      });
+    } else {
+      // 如果文件未找到或出现其他错误，则返回错误信息
+      return new Response(`Error fetching file: ${response.status} ${response.statusText}`, { status: response.status });
+    }
+  },
+};
