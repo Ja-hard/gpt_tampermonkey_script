@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         AcWing Better!
-// @version      3.29.0_rev2
+// @version      3.29.0_rev3
 // @description  AcWing界面美化，功能增强，视频时间点标记跳转，代码markdown一键复制，修改视频播放器大小为撑满网页剩余空间（Line 1332），增加护眼遮罩功能
 // @author       北极小狐
 // @match        https://www.acwing.com/*
@@ -1373,10 +1373,10 @@ $(document).ready(function () {
     GM_addStyle(`
         .prism-player {
             position: fixed !important;
-            top: 50px !important;
+            top: 3.5vh !important;
             left: 0 !important;
             width: 100vw !important;
-            height: calc(100vh - 100px) !important;
+            height: 93vh !important;
             z-index: 9999 !important;
             background-color: #000 !important;
             object-fit: contain !important;
